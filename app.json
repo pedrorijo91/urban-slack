@@ -1,0 +1,7 @@
+
+{
+  "name": "Slack Urban dictionary",
+  "description": "Slack integration that allows you to search Urban Dictionary terms.",
+  "repository": "https://github.com/pedrorijo91/urban-slack",
+  "keywords": ["scala", "urban dictionary", "slack"]
+}
