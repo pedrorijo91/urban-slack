@@ -4,13 +4,14 @@ import java.net.URLEncoder
 import models.{UrbanResponse, UrbanResponseResultType}
 import play.api.Logger
 import play.api.Play.current
+import play.api.libs.json.Json
 import play.api.libs.ws.{WS, WSResponse}
 import play.api.mvc._
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
-
+import org.apache.commons.lang3.StringEscapeUtils._
 
 object Application extends Controller {
 
@@ -76,7 +77,7 @@ object Application extends Controller {
   }
 
 
-  def prettyUrban = Action {
+  def prettyUrbanJson = Action {
     request =>
 
       request.body.asFormUrlEncoded.fold {
@@ -110,8 +111,7 @@ object Application extends Controller {
                 NotFound(s"No definitions were found to '$term' on Urban Dictionary")
               case Right(urbanResponse) =>
                 Logger.info(s"Success response: ${urbanResponse.resultType} => ${urbanResponse.definitions.size}")
-                val message = createResponse(term, urbanResponse)
-                Ok(message)
+                createJsonResponse(term, urbanResponse)
             }
           } match {
             case Failure(ex) =>
@@ -121,6 +121,42 @@ object Application extends Controller {
               r
           }
       }
+  }
+
+  private def createJsonResponse(term: String, urbanResponse: UrbanResponse): Result = {
+
+    urbanResponse.definitions.headOption.map {
+      definition =>
+
+        val json =
+          s"""
+             |{
+             |    "response_type": "in_channel",
+             |    "attachments": [
+             |        {
+             |            "fallback": "Urban dictionary for $term",
+             |            "title": "$term",
+             |            "title_link": "${definition.permalink}",
+             |            "text":"${escapeJava(definition.definition)}",
+             |            "fields": [
+             |                {
+             |                    "title": "Thumbs",
+             |                    "value": "${definition.thumbsUp} Up / ${definition.thumbsDown} Down",
+             |                    "short": true
+             |                },
+             |                {
+             |                    "title": "Author",
+             |                    "value": "${definition.author}",
+             |                    "short": true
+             |                }
+             |            ]
+             |        }
+             |    ]
+             |}
+        """.stripMargin
+
+        Ok(Json.parse(json)).withHeaders(("content-type", "application/json"))
+    }.getOrElse(NotFound("Not found on Urban Dictionary"))
   }
 
 }
